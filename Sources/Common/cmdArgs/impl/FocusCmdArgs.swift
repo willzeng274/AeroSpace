@@ -214,6 +214,6 @@ private func parseBoundaries(i: SubArgParserInput) -> ParsedCliArgs<FocusCmdArgs
     }
 }
 
-func parseCardinalDfsOrHistory(i: ArgParserInput) -> ParsedCliArgs<CardinalDfsOrHistory> {
+func parseCardinalDfsOrHistory(i: PosArgParserInput) -> ParsedCliArgs<CardinalDfsOrHistory> {
     .init(parseEnum(i.arg, CardinalDfsOrHistory.self), advanceBy: 1)
 }
