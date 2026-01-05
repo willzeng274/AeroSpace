@@ -2,9 +2,11 @@ import Common
 import TOMLKit
 
 struct Mode: ConvenienceCopyable, Equatable, Sendable {
-    var bindings: [String: HotkeyBinding]
+    /// User visible name. Optional. todo drop it?
+    var name: String?
+    var bindings: [HotkeyBinding]
 
-    static let zero = Mode(bindings: [:])
+    static let zero = Mode(name: nil, bindings: [])
 }
 
 func parseModes(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace, _ errors: inout [TomlParseError], _ mapping: [String: UInt32]) -> [String: Mode] {
