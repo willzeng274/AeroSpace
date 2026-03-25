@@ -209,14 +209,10 @@ enum KeyMatch: Equatable, Hashable {
 }
 
 struct Hotkey: Equatable, Sendable {
-    let modifiers: CGEventFlags
-    let key: KeyMatch
     let description: String
     let expanded: [ExpandedHotkey]
 
     init(modifiers: CGEventFlags, key: KeyMatch) {
-        self.modifiers = modifiers
-        self.key = key
         self.description = modifiers.isEmpty
             ? key.symbol
             : modifiers.toString() + "-" + key.symbol
