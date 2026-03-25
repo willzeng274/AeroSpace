@@ -35,9 +35,20 @@ final class MacWindow: Window {
         allWindowsMap[windowId] = window
 
         try await debugWindowsIfRecording(window)
-        defer { window.isAwaitingOnWindowDetected = false }
-        if try await !restoreClosedWindowsCacheIfNeeded(newlyDetectedWindow: window) {
-            try await tryOnWindowDetected(window)
+        // Run detection in an unstructured Task so it survives runLightSession cancelling
+        // activeRefreshTask (e.g. focus-follows-mouse fires while a rule is being evaluated).
+        // The flag blocks layoutWorkspaces from touching this window until detection finishes.
+        Task { @MainActor in
+            do {
+                if try await !restoreClosedWindowsCacheIfNeeded(newlyDetectedWindow: window) {
+                    try await tryOnWindowDetected(window)
+                }
+            } catch {}
+            // Clear the flag first so layoutWorkspace sees the window in its final state.
+            window.isAwaitingOnWindowDetected = false
+            // Layout just this workspace to position the window without triggering a new
+            // full session (which would cancel other in-flight sessions).
+            try? await window.nodeWorkspace?.layoutWorkspace()
         }
         return window
     }
