@@ -1,6 +1,15 @@
 import AppKit
 import Common
 
+// SkyLight private APIs for cross-monitor same-app window focus (fixes #101).
+// Technique from yabai (window_manager.c) and Amethyst (PR #1530). No SIP required.
+@_silgen_name("GetProcessForPID") @discardableResult
+private func GetProcessForPID(_ pid: pid_t, _ psn: inout ProcessSerialNumber) -> OSStatus
+@_silgen_name("_SLPSSetFrontProcessWithOptions") @discardableResult
+private func _SLPSSetFrontProcessWithOptions(_ psn: inout ProcessSerialNumber, _ wid: UInt32, _ mode: UInt32) -> CGError
+@_silgen_name("SLPSPostEventRecordTo") @discardableResult
+private func SLPSPostEventRecordTo(_ psn: inout ProcessSerialNumber, _ bytes: inout UInt8) -> CGError
+
 // Potential alternative implementation
 // https://github.com/swiftlang/swift-evolution/blob/main/proposals/0392-custom-actor-executors.md
 // (only available since macOS 14)
@@ -122,11 +131,33 @@ final class MacApp: AbstractApp {
         {
             nsApp.activate(options: .activateIgnoringOtherApps)
         } else {
-            MacApp.focusJob = withWindowAsync(windowId) { [nsApp] window, job in
-                // Raise firstly to make sure that by the time we activate the app, the window would be already on top
+            // Use SkyLight private APIs to focus the specific window.
+            // nsApp.activate() alone can focus the wrong window when the same app
+            // has windows on multiple monitors (macOS bug, see issue #101).
+            // _SLPSSetFrontProcessWithOptions + SLPSPostEventRecordTo tell macOS
+            // exactly which window should be focused. Used by Amethyst, yabai,
+            // alt-tab-macos, and others. Does NOT require SIP.
+            var psn = ProcessSerialNumber()
+            let psnResult = GetProcessForPID(pid, &psn)
+            if psnResult == noErr {
+                _SLPSSetFrontProcessWithOptions(&psn, windowId, 0x200)
+                // Synthesize key-window events (mouse down + up) targeted at the window
+                for eventType: UInt8 in [0x01, 0x02] {
+                    var bytes = [UInt8](repeating: 0, count: 0xF8)
+                    bytes[0x04] = 0xF8
+                    bytes[0x08] = eventType
+                    bytes[0x3A] = 0x10
+                    withUnsafeBytes(of: windowId) { src in
+                        for i in 0..<MemoryLayout<UInt32>.size { bytes[0x3C + i] = src[i] }
+                    }
+                    memset(&bytes[0x20], 0xFF, 0x10)
+                    SLPSPostEventRecordTo(&psn, &bytes[0])
+                }
+            }
+            // Still raise via AX API to ensure window is visually on top
+            MacApp.focusJob = withWindowAsync(windowId) { window, job in
                 window.set(Ax.isMainAttr, true)
                 AXUIElementPerformAction(window, kAXRaiseAction as CFString)
-                nsApp.activate(options: .activateIgnoringOtherApps)
             }
         }
     }
