@@ -96,7 +96,14 @@ final class MacWindow: Window {
         let parent = unbindFromParent().parent
         let deadWindowWorkspace = parent.nodeWorkspace
         let focus = focus
-        if let deadWindowWorkspace, deadWindowWorkspace == focus.workspace ||
+        // Check if the dead window's workspace is visible on any monitor.
+        // macOS may have already jumped focus to a same-app window on a different workspace
+        // (via updateFocusCache) before garbageCollect runs, so we can't rely solely on
+        // deadWindowWorkspace == focus.workspace.
+        let deadWorkspaceIsVisible = deadWindowWorkspace.flatMap { ws in
+            monitors.contains { $0.activeWorkspace == ws }
+        } ?? false
+        if let deadWindowWorkspace, deadWorkspaceIsVisible ||
             deadWindowWorkspace == prevFocusedWorkspace && prevFocusedWorkspaceDate.distance(to: .now) < 1
         {
             switch parent.cases {
@@ -115,9 +122,15 @@ final class MacWindow: Window {
                     let deadWindowFocus = deadWindowWorkspace.toLiveFocus()
                     _ = setFocus(to: deadWindowFocus)
                     // Guard against "Apple Reminders popup" bug: https://github.com/nikitabobko/AeroSpace/issues/201
-                    if focus.windowOrNil?.app.pid != app.pid {
-                        // Force focus to fix macOS annoyance with focused apps without windows.
+                    // Don't force focus if the NEW focus target is the same app as the dead window —
+                    // the app may be handling its own focus transition (e.g., opening a popup).
+                    // Use deadWindowFocus (not global focus) because updateFocusCache may have
+                    // already corrupted the global focus with macOS's wrong same-app choice.
+                    if deadWindowFocus.windowOrNil?.app.pid != app.pid {
+                        // Force focus to fix macOS annoyance with focused apps without windows
                         //   https://github.com/nikitabobko/AeroSpace/issues/65
+                        // and to override macOS's automatic same-app focus which may have
+                        // jumped to another workspace after window close.
                         deadWindowFocus.windowOrNil?.nativeFocus()
                     }
                 case .macosPopupWindowsContainer, .macosMinimizedWindowsContainer:
