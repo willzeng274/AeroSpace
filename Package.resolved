@@ -1,5 +1,5 @@
 {
-  "originHash" : "11117eb69fbfb577e73c8b04d7effa148519c3cce2deb17e8a784e1319359327",
+  "originHash" : "bde659f50c9fe451e754cb77ff3a613afb2fabc55b6fa74976a44ec196d4ee90",
   "pins" : [
     {
       "identity" : "antlr4",
@@ -29,12 +29,12 @@
       }
     },
     {
-      "identity" : "tomlkit",
+      "identity" : "tomldecoder",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/LebJe/TOMLKit",
+      "location" : "https://github.com/dduan/TOMLDecoder",
       "state" : {
-        "revision" : "404c4dd011743461bff12d00a5118d0ed59d630c",
-        "version" : "0.5.5"
+        "revision" : "fa1103a62b1c08cc08eabc58dda8b55887ff1622",
+        "version" : "0.4.4"
       }
     }
   ],

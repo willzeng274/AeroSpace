@@ -1,7 +1,6 @@
 import AppKit
 import Common
 import Foundation
-import TOMLKit
 
 @MainActor private var keyboardMonitor: KeyboardMonitor?
 @MainActor private var hotkeys: [ExpandedHotkey: () -> Void] = [:]
@@ -245,18 +244,18 @@ struct HotkeyBinding: Equatable, Sendable {
     }
 }
 
-func parseBindings(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace, _ errors: inout [TomlParseError], _ mapping: KeyMapping) -> [HotkeyBinding] {
-    guard let rawTable = raw.table else {
-        errors += [expectedActualTypeError(expected: .table, actual: raw.type, backtrace)]
+func parseBindings(_ raw: Json, _ backtrace: ConfigBacktrace, _ errors: inout [ConfigParseError], _ mapping: KeyMapping) -> [HotkeyBinding] {
+    guard let rawTable = raw.asDictOrNil else {
+        errors += [expectedActualTypeError(expected: .table, actual: raw.tomlType, backtrace)]
         return []
     }
     var existingHotkeys = Set<ExpandedHotkey>()
     var result: [HotkeyBinding] = []
-    for (binding, rawCommand): (String, TOMLValueConvertible) in rawTable {
+    for (binding, rawCommand): (String, Json) in rawTable.sorted(by: { $0.key < $1.key }) {
         let backtrace = backtrace + .key(binding)
         let binding = parseBinding(binding, backtrace, mapping)
-            .flatMap { hotkey -> ParsedToml<HotkeyBinding> in
-                parseCommandOrCommands(rawCommand).toParsedToml(backtrace).map {
+            .flatMap { hotkey -> ParsedConfig<HotkeyBinding> in
+                parseCommandOrCommands(rawCommand).toParsedConfig(backtrace).map {
                     HotkeyBinding(hotkey: hotkey, commands: $0)
                 }
             }
@@ -269,12 +268,12 @@ func parseBindings(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace, _ er
             result.append(binding)
         }
     }
-    return result
+    return result.sorted { $0.hotkey.description < $1.hotkey.description }
 }
 
-func parseBinding(_ raw: String, _ backtrace: TomlBacktrace, _ mapping: KeyMapping) -> ParsedToml<Hotkey> {
+func parseBinding(_ raw: String, _ backtrace: ConfigBacktrace, _ mapping: KeyMapping) -> ParsedConfig<Hotkey> {
     let rawKeys = raw.split(separator: "-")
-    let modifiers: ParsedToml<CGEventFlags> = rawKeys.dropLast()
+    let modifiers: ParsedConfig<CGEventFlags> = rawKeys.dropLast()
         .mapAllOrFailure {
             modifiersMap[String($0)].orFailure(.semantic(backtrace, "Can't parse modifiers in '\(raw)' binding"))
         }
@@ -308,10 +307,10 @@ func parseBinding(_ raw: String, _ backtrace: TomlBacktrace, _ mapping: KeyMappi
                 }
     }
 
-    return modifiers.flatMap { modifiers -> ParsedToml<Hotkey> in
+    return modifiers.flatMap { modifiers -> ParsedConfig<Hotkey> in
         key
             .orFailure(.semantic(backtrace, "Can't parse the key in '\(raw)' binding"))
-            .flatMap { key -> ParsedToml<Hotkey> in
+            .flatMap { key -> ParsedConfig<Hotkey> in
                 .success(Hotkey(modifiers: modifiers, key: key))
             }
     }

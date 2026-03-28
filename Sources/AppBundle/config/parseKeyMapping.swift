@@ -1,5 +1,4 @@
 import Common
-import TOMLKit
 
 private let keyMappingParser: [String: any ParserProtocol<KeyMapping>] = [
     "preset": Parser(\.preset, parsePreset),
@@ -39,21 +38,21 @@ struct KeyMapping: ConvenienceCopyable, Equatable, Sendable {
     }
 }
 
-func parseKeyMapping(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace, _ errors: inout [TomlParseError]) -> KeyMapping {
+func parseKeyMapping(_ raw: Json, _ backtrace: ConfigBacktrace, _ errors: inout [ConfigParseError]) -> KeyMapping {
     parseTable(raw, KeyMapping(), keyMappingParser, backtrace, &errors)
 }
 
-private func parsePreset(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace) -> ParsedToml<KeyMapping.Preset> {
-    parseString(raw, backtrace).flatMap { parseEnum($0, KeyMapping.Preset.self).toParsedToml(backtrace) }
+private func parsePreset(_ raw: Json, _ backtrace: ConfigBacktrace) -> ParsedConfig<KeyMapping.Preset> {
+    parseString(raw, backtrace).flatMap { parseEnum($0, KeyMapping.Preset.self).toParsedConfig(backtrace) }
 }
 
-private func parseKeyNotationToKeyCode(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace, _ errors: inout [TomlParseError]) -> [String: UInt32] {
+private func parseKeyNotationToKeyCode(_ raw: Json, _ backtrace: ConfigBacktrace, _ errors: inout [ConfigParseError]) -> [String: UInt32] {
     var result: [String: UInt32] = [:]
-    guard let table = raw.table else {
-        errors.append(expectedActualTypeError(expected: .table, actual: raw.type, backtrace))
+    guard let table = raw.asDictOrNil else {
+        errors.append(expectedActualTypeError(expected: .table, actual: raw.tomlType, backtrace))
         return result
     }
-    for (key, value): (String, TOMLValueConvertible) in table {
+    for (key, value): (String, Json) in table {
         if isValidKeyNotation(key) {
             let backtrace = backtrace + .key(key)
             if let value = parseString(value, backtrace).getOrNil(appendErrorTo: &errors) {
@@ -74,6 +73,6 @@ private func isValidKeyNotation(_ str: String) -> Bool {
     str.rangeOfCharacter(from: .whitespacesAndNewlines) == nil && !str.contains("-")
 }
 
-private func parseMatchKeyEventBy(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace) -> ParsedToml<KeyMapping.MatchKeyEventBy> {
-    parseString(raw, backtrace).flatMap { parseEnum($0, KeyMapping.MatchKeyEventBy.self).toParsedToml(backtrace) }
+private func parseMatchKeyEventBy(_ raw: Json, _ backtrace: ConfigBacktrace) -> ParsedConfig<KeyMapping.MatchKeyEventBy> {
+    parseString(raw, backtrace).flatMap { parseEnum($0, KeyMapping.MatchKeyEventBy.self).toParsedConfig(backtrace) }
 }

@@ -6,15 +6,10 @@ The AeroSpace itself is licensed under MIT. See [LICENSE](./LICENSE.txt) for the
 
 AeroSpace bundles the following dependencies and uses the following materials:
 
-**TOMLKIT**.
-[TOMLKIT GitHub link](https://github.com/LebJe/TOMLKit).
-[TOMLKIT MIT license](./third-party-license/LICENSE-TOMLKIT.txt).
-TOMLKIT is used as a more convenient Swift wrapper around tomlplusplus C++ API.
-
-**tomlplusplus**.
-[tomlplusplus GitHub link](https://github.com/marzer/tomlplusplus).
-[tomlplusplus MIT license](./third-party-license/LICENSE-tomlplusplus.txt).
-tomlplusplus is used as TOML parser. tomlplusplus is used indirectly through TOMLKIT Swift API.
+**TOMLDecoder**.
+[TOMLDecoder GitHub link](https://github.com/LebJe/TOMLKit).
+[TOMLDecoder MIT license](./third-party-license/LICENSE-TOMLDecoder.txt).
+TOMLDecoder is used as TOML parsing library.
 
 **ANTLR v4**.
 [ANTLR v4 GitHub link](https://github.com/antlr/antlr4).

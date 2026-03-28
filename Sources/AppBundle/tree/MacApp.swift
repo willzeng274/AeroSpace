@@ -4,11 +4,11 @@ import Common
 // SkyLight private APIs for cross-monitor same-app window focus (fixes #101).
 // Technique from yabai (window_manager.c) and Amethyst (PR #1530). No SIP required.
 @_silgen_name("GetProcessForPID") @discardableResult
-private func GetProcessForPID(_ pid: pid_t, _ psn: inout ProcessSerialNumber) -> OSStatus
+private func GetProcessForPID(_: pid_t, _: inout ProcessSerialNumber) -> OSStatus
 @_silgen_name("_SLPSSetFrontProcessWithOptions") @discardableResult
-private func _SLPSSetFrontProcessWithOptions(_ psn: inout ProcessSerialNumber, _ wid: UInt32, _ mode: UInt32) -> CGError
+private func _SLPSSetFrontProcessWithOptions(_: inout ProcessSerialNumber, _: UInt32, _: UInt32) -> CGError
 @_silgen_name("SLPSPostEventRecordTo") @discardableResult
-private func SLPSPostEventRecordTo(_ psn: inout ProcessSerialNumber, _ bytes: inout UInt8) -> CGError
+private func SLPSPostEventRecordTo(_: inout ProcessSerialNumber, _: inout UInt8) -> CGError
 
 // Potential alternative implementation
 // https://github.com/swiftlang/swift-evolution/blob/main/proposals/0392-custom-actor-executors.md
@@ -148,7 +148,7 @@ final class MacApp: AbstractApp {
                     bytes[0x08] = eventType
                     bytes[0x3A] = 0x10
                     withUnsafeBytes(of: windowId) { src in
-                        for i in 0..<MemoryLayout<UInt32>.size { bytes[0x3C + i] = src[i] }
+                        for i in 0 ..< MemoryLayout<UInt32>.size { bytes[0x3C + i] = src[i] }
                     }
                     memset(&bytes[0x20], 0xFF, 0x10)
                     SLPSPostEventRecordTo(&psn, &bytes[0])
