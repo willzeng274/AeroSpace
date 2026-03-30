@@ -268,10 +268,7 @@ func tomlAnyToParsedConfigRecursive(any: Any, _ backtrace: ConfigBacktrace) -> P
     return (config, errors)
 }
 
-func parseIndentForNestedContainersWithTheSameOrientation(
-    _ _: Json,
-    _ backtrace: ConfigBacktrace,
-) -> ParsedConfig<Void> {
+func parseIndentForNestedContainersWithTheSameOrientation(_ _: Json, _ backtrace: ConfigBacktrace) -> ParsedConfig<Void> {
     let msg = "Deprecated. Please drop it from the config. See https://github.com/nikitabobko/AeroSpace/issues/96"
     return .failure(.semantic(backtrace, msg))
 }
@@ -291,7 +288,7 @@ func parseString(_ raw: Json, _ backtrace: ConfigBacktrace) -> ParsedConfig<Stri
     raw.asStringOrNil.orFailure(expectedActualTypeError(expected: .string, actual: raw.tomlType, backtrace))
 }
 
-func parseSimpleType<T>(_ raw: Json) -> T? {
+func parseSimpleType<T>(_ raw: Json, ofType: T.Type) -> T? {
     (raw.asIntOrNil as? T) ?? (raw.asStringOrNil as? T) ?? (raw.asBoolOrNil as? T)
 }
 
