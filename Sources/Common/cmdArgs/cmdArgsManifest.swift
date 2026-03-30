@@ -1,6 +1,7 @@
 public enum CmdKind: String, CaseIterable, Equatable, Sendable {
     // Sorted
 
+    case alwaysOnTop = "always-on-top"
     case balanceSizes = "balance-sizes"
     case close
     case closeAllWindowsButCurrent = "close-all-windows-but-current"
@@ -45,6 +46,8 @@ func initSubcommands() -> [String: any SubCommandParserProtocol] {
     var result: [String: any SubCommandParserProtocol] = [:]
     for kind in CmdKind.allCases {
         switch kind {
+            case .alwaysOnTop:
+                result[kind.rawValue] = SubCommandParser(AlwaysOnTopCmdArgs.init)
             case .balanceSizes:
                 result[kind.rawValue] = SubCommandParser(BalanceSizesCmdArgs.init)
             case .close:

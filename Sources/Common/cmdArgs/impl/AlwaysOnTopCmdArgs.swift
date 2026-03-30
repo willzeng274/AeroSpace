@@ -1,0 +1,13 @@
+public struct AlwaysOnTopCmdArgs: CmdArgs {
+    /*conforms*/ public var commonState: CmdArgsCommonState
+    public init(rawArgs: StrArrSlice) { self.commonState = .init(rawArgs) }
+    public static let parser: CmdParser<Self> = .init(
+        kind: .alwaysOnTop,
+        allowInConfig: true,
+        help: always_on_top_help_generated,
+        flags: [
+            "--window-id": optionalWindowIdFlag(),
+        ],
+        posArgs: [],
+    )
+}

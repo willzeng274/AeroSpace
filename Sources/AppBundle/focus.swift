@@ -178,6 +178,9 @@ private let maxFocusHistorySize = 100
     defer { onFocusChangedRecursionGuard = false }
     if hasFocusChanged {
         onFocusChanged(focus)
+        if OverlayManager.shared.hasPinnedWindows {
+            OverlayManager.shared.updateOverlayState()
+        }
     }
     if let _prevFocusedWorkspaceName, hasFocusedWorkspaceChanged {
         onWorkspaceChanged(_prevFocusedWorkspaceName, frozenFocus.workspaceName)
