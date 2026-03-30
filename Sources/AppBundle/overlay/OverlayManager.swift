@@ -21,7 +21,7 @@ final class OverlayManager {
             let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
             guard let scWindow = content.windows.first(where: { $0.windowID == windowId }) else { return false }
 
-            let monitor = monitorForFrame(frame)
+            let monitor = NSScreen.screens.first { $0.frame.intersects(frame) } ?? NSScreen.main
             let scaleFactor = Int(monitor?.backingScaleFactor ?? 2)
 
             let filter = SCContentFilter(desktopIndependentWindow: scWindow)
@@ -44,7 +44,6 @@ final class OverlayManager {
                 overlayWindow: overlayWindow,
                 macWindow: macWindow,
                 streamOutput: output,
-                lastFrame: frame,
             )
 
             updateOverlayState()
@@ -69,32 +68,32 @@ final class OverlayManager {
         }
     }
 
-    /// Update overlay visibility and position on every focus change.
+    /// Update overlay visibility and sync frame when the real window is visible.
     func updateOverlayState() {
         let focusedWindowId = focus.windowOrNil?.windowId
         for (windowId, pinned) in pinnedWindows {
             if focusedWindowId == windowId {
                 pinned.overlayWindow.orderOut(nil)
+                // Window is focused (visible) — sync frame for when overlay reappears
+                Task { await syncOverlayFrame(pinned) }
             } else {
-                Task { await syncOverlayFrame(windowId: windowId) }
+                pinned.overlayWindow.orderFrontRegardless()
+                // Only sync if the window is visible (not hidden in a corner)
+                if !pinned.macWindow.isHiddenInCorner {
+                    Task { await syncOverlayFrame(pinned) }
+                }
             }
         }
     }
 
-    /// Sync overlay frame and stream resolution to match the real window's current position/monitor.
-    private func syncOverlayFrame(windowId: UInt32) async {
-        guard let pinned = pinnedWindows[windowId] else { return }
+    private func syncOverlayFrame(_ pinned: PinnedWindow) async {
         guard let rect = try? await pinned.macWindow.getAxRect() else { return }
-
         let mainScreenHeight = NSScreen.screens.first?.frame.height ?? 0
         let cocoaY = mainScreenHeight - rect.topLeftY - rect.height
         let frame = NSRect(x: rect.topLeftX, y: cocoaY, width: rect.width, height: rect.height)
-
-        if frame != pinned.lastFrame {
-            pinnedWindows[windowId]?.lastFrame = frame
+        if pinned.overlayWindow.frame != frame {
             pinned.overlayWindow.setFrame(frame, display: false)
-
-            let monitor = monitorForFrame(frame)
+            let monitor = NSScreen.screens.first { $0.frame.intersects(frame) } ?? NSScreen.main
             let scaleFactor = Int(monitor?.backingScaleFactor ?? 2)
             let config = SCStreamConfiguration()
             config.width = Int(frame.width) * scaleFactor
@@ -104,8 +103,6 @@ final class OverlayManager {
             config.showsCursor = false
             try? await pinned.stream.updateConfiguration(config)
         }
-
-        pinned.overlayWindow.orderFrontRegardless()
     }
 
     /// Called when an overlay is clicked — navigate to the pinned window's workspace and focus it.
@@ -122,10 +119,6 @@ final class OverlayManager {
         }
     }
 
-    /// Find which NSScreen contains the given Cocoa frame.
-    private func monitorForFrame(_ frame: NSRect) -> NSScreen? {
-        NSScreen.screens.first { $0.frame.intersects(frame) } ?? NSScreen.main
-    }
 }
 
 private struct PinnedWindow {
@@ -133,7 +126,6 @@ private struct PinnedWindow {
     let overlayWindow: OverlayPanel
     let macWindow: MacWindow
     let streamOutput: OverlayStreamOutput
-    var lastFrame: NSRect
 }
 
 final class OverlayPanel: NSPanelHud {
@@ -144,6 +136,7 @@ final class OverlayPanel: NSPanelHud {
         self.pinnedWindowId = windowId
         self.displayView = OverlayDisplayView(frame: frame)
         super.init()
+        self.alphaValue = 0.99
         self.contentView = displayView
         self.setFrame(frame, display: true)
     }
