@@ -81,6 +81,7 @@ public enum RefreshSessionEvent: Sendable, CustomStringConvertible {
     case onFocusChanged
     case onModeChanged
     case focusFollowsMouse
+    case onMonitorChanged
 
     public var isStartup: Bool {
         if case .startup = self { return true } else { return false }
@@ -101,6 +102,7 @@ public enum RefreshSessionEvent: Sendable, CustomStringConvertible {
             case .onFocusChanged: "onFocusChanged"
             case .onModeChanged: "onModeChanged"
             case .focusFollowsMouse: "focusFollowsMouse"
+            case .onMonitorChanged: "onMonitorChanged"
         }
     }
 }
