@@ -44,6 +44,7 @@ private func moveFloatingWindow(_ window: Window) async throws {
     guard let parent = window.parent else { return }
     if targetWorkspace != parent {
         window.bindAsFloatingWindow(to: targetWorkspace)
+        _ = window.focusWindow()
     }
 }
 
