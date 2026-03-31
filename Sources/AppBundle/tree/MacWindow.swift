@@ -4,6 +4,8 @@ import Common
 final class MacWindow: Window {
     let macApp: MacApp
     private var prevUnhiddenProportionalPositionInsideWorkspaceRect: CGPoint?
+    private var prevUnhiddenMonitorWidth: CGFloat = 0
+    private var prevUnhiddenMonitorHeight: CGFloat = 0
 
     @MainActor
     private init(_ id: UInt32, _ actor: MacApp, lastFloatingSize: CGSize?, parent: NonLeafTreeNodeObject, adaptiveWeight: CGFloat, index: Int) {
@@ -168,6 +170,8 @@ final class MacWindow: Window {
                 let absolutePoint = topLeftCorner - monitorRect.topLeftCorner
                 prevUnhiddenProportionalPositionInsideWorkspaceRect =
                     CGPoint(x: absolutePoint.x / monitorRect.width, y: absolutePoint.y / monitorRect.height)
+                prevUnhiddenMonitorWidth = monitorRect.width
+                prevUnhiddenMonitorHeight = monitorRect.height
             }
         }
         let p: CGPoint
@@ -200,13 +204,15 @@ final class MacWindow: Window {
                 let workspaceRect = nodeWorkspace.workspaceMonitor.rect
                 var newX = workspaceRect.topLeftX + workspaceRect.width * prevUnhiddenProportionalPositionInsideWorkspaceRect.x
                 var newY = workspaceRect.topLeftY + workspaceRect.height * prevUnhiddenProportionalPositionInsideWorkspaceRect.y
-                // todo we probably should replace lastFloatingSize with proper floating window sizing
-                // https://github.com/nikitabobko/AeroSpace/issues/1519
+                // Only coerce when restoring to a different-sized monitor (cross-resolution move).
+                // On the same monitor, preserve the exact position even if partially off-screen.
+                // https://github.com/nikitabobko/AeroSpace/discussions/1875
                 let windowWidth = lastFloatingSize?.width ?? 0
                 let windowHeight = lastFloatingSize?.height ?? 0
-                newX = newX.coerce(in: workspaceRect.minX ... max(workspaceRect.minX, workspaceRect.maxX - windowWidth))
-                newY = newY.coerce(in: workspaceRect.minY ... max(workspaceRect.minY, workspaceRect.maxY - windowHeight))
-
+                if workspaceRect.width != prevUnhiddenMonitorWidth || workspaceRect.height != prevUnhiddenMonitorHeight {
+                    newX = newX.coerce(in: workspaceRect.minX ... max(workspaceRect.minX, workspaceRect.maxX - windowWidth))
+                    newY = newY.coerce(in: workspaceRect.minY ... max(workspaceRect.minY, workspaceRect.maxY - windowHeight))
+                }
                 setAxFrame(CGPoint(x: newX, y: newY), nil)
             case .macosNativeFullscreenWindow, .macosNativeHiddenAppWindow, .macosNativeMinimizedWindow,
                  .macosPopupWindow, .tiling, .rootTilingContainer, .shimContainerRelation: break

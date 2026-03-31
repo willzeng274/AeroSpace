@@ -112,19 +112,19 @@ final class OverlayManager {
         Task {
             guard let token: RunSessionGuard = .isServerEnabled else { return }
             try await runLightSession(.hotkeyBinding, token) {
-                workspace.focusWorkspace()
+                _ = workspace.focusWorkspace()
                 _ = pinned.macWindow.focusWindow()
                 pinned.macWindow.nativeFocus()
             }
         }
     }
-
 }
 
 private struct PinnedWindow {
     let stream: SCStream
     let overlayWindow: OverlayPanel
     let macWindow: MacWindow
+    // periphery:ignore - retained to keep the SCStreamOutput delegate alive
     let streamOutput: OverlayStreamOutput
 }
 
