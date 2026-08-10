@@ -49,8 +49,8 @@ final class OverlayManager {
     }
 
     nonisolated func handleWindowClosed(windowId: UInt32) {
-        Task { @MainActor in
-            guard let pinned = pinnedWindows.removeValue(forKey: windowId) else { return }
+        Task.startUnstructured { @MainActor in
+            guard let pinned = self.pinnedWindows.removeValue(forKey: windowId) else { return }
             try? await pinned.stream.stopCapture()
             pinned.overlayWindow.close()
         }
@@ -61,11 +61,11 @@ final class OverlayManager {
         for (windowId, pinned) in pinnedWindows {
             if focusedWindowId == windowId {
                 pinned.overlayWindow.orderOut(nil)
-                Task { await syncOverlayFrame(pinned) }
+                Task.startUnstructured { await self.syncOverlayFrame(pinned) }
             } else {
                 pinned.overlayWindow.orderFrontRegardless()
                 if !pinned.macWindow.isHiddenInCorner {
-                    Task { await syncOverlayFrame(pinned) }
+                    Task.startUnstructured { await self.syncOverlayFrame(pinned) }
                 }
             }
         }
@@ -86,7 +86,7 @@ final class OverlayManager {
 
     func handleOverlayClicked(windowId: UInt32) {
         guard let pinned = pinnedWindows[windowId], let workspace = pinned.macWindow.nodeWorkspace else { return }
-        Task {
+        Task.startUnstructured {
             guard let token: RunSessionGuard = .isServerEnabled else { return }
             try await runLightSession(.hotkeyBinding, token) {
                 _ = workspace.focusWorkspace()
@@ -131,7 +131,7 @@ final class OverlayPanel: NSPanelHud {
     }
 
     override func mouseDown(with _: NSEvent) {
-        Task { @MainActor in OverlayManager.shared.handleOverlayClicked(windowId: pinnedWindowId) }
+        Task.startUnstructured { @MainActor in OverlayManager.shared.handleOverlayClicked(windowId: self.pinnedWindowId) }
     }
 }
 
