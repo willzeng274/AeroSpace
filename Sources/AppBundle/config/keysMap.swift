@@ -245,13 +245,6 @@ private let colemakMap: [String: Key] = keyNotationToKeyCode + [
     slash: .slash,
 ]
 
-let modifiersMap: [String: NSEvent.ModifierFlags] = [
-    "shift": .shift,
-    "alt": .option,
-    "ctrl": .control,
-    "cmd": .command,
-]
-
 extension NSEvent.ModifierFlags {
     func toString() -> String {
         var result: [String] = []

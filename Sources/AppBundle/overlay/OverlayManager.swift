@@ -113,7 +113,7 @@ private struct PinnedWindow {
     let stream: SCStream
     let overlayWindow: OverlayPanel
     let macWindow: MacWindow
-    // Retain the stream output for the lifetime of the stream.
+    // periphery:ignore - Retained to keep the SCStreamOutput delegate alive.
     let streamOutput: OverlayStreamOutput
 }
 
