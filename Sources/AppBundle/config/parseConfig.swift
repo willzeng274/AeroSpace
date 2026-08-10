@@ -134,6 +134,7 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "on-focus-changed": Parser(\.onFocusChanged, parseShellOfCommandsForConfig),
     "on-mode-changed": Parser(\.onModeChanged, parseShellOfCommandsForConfig),
     "on-focused-monitor-changed": Parser(\.onFocusedMonitorChanged, parseShellOfCommandsForConfig),
+    "on-monitor-changed": Parser(\.onMonitorChanged, parseShellOfCommandsForConfig),
     // "on-focused-workspace-changed": Parser(\.onFocusedWorkspaceChanged, { parseCommandOrCommands($0).toParsedConfig($1) }),
 
     "enable-normalization-flatten-containers": Parser(\.enableNormalizationFlattenContainers, parseBool),

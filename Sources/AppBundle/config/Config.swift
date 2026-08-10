@@ -55,6 +55,7 @@ struct Config: ConvenienceMutable {
     var onFocusChanged: Shell<any Command> = .empty
     // var onFocusedWorkspaceChanged: [any Command] = []
     var onFocusedMonitorChanged: Shell<any Command> = .empty
+    var onMonitorChanged: Shell<any Command> = .empty
 
     var gaps: Gaps = .zero
     var workspaceToMonitorForceAssignment: [String: [MonitorDescription]] = [:]

@@ -53,6 +53,17 @@ enum GlobalObserver {
         nc.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main, using: onNotif)
         nc.addObserver(forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main, using: onNotif)
 
+        // CoreGraphics reports several phases for one display reconfiguration. Refresh only
+        // after the transaction finishes; the monitor callback itself is de-duplicated by
+        // comparing the resulting monitor count.
+        unsafe CGDisplayRegisterReconfigurationCallback({ _, flags, _ in
+            guard !flags.contains(.beginConfigurationFlag) else { return }
+            Task.startUnstructured { @MainActor in
+                if !TrayMenuModel.shared.isEnabled { return }
+                scheduleCancellableCompleteRefreshSession(.globalObserver("displayReconfiguration"))
+            }
+        }, nil)
+
         NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp) { _ in
             // todo reduce number of refreshSession in the callback
             //  resetManipulatedWithMouseIfPossible might call its own refreshSession

@@ -132,11 +132,23 @@ extension MonitorInfo {
     }
 }
 
+@MainActor private var previousMonitorCount = NSScreen.screens.count
+
 @MainActor
 func gcMonitors() {
     if screenPointToVisibleWorkspace.count != monitorInfos.count {
         rearrangeWorkspacesOnMonitors()
     }
+}
+
+/// Fire after layout completes so external consumers observe the final monitor/workspace state.
+@MainActor
+func checkOnMonitorChangedCallback() async {
+    let currentMonitorCount = monitorInfos.count
+    guard currentMonitorCount != previousMonitorCount else { return }
+    previousMonitorCount = currentMonitorCount
+    broadcastEvent(.monitorChanged(monitorCount: currentMonitorCount))
+    _ = await config.onMonitorChanged.run(.defaultEnv, CmdIoImpl.emptyStdinIgnoringOut)
 }
 
 extension CGPoint {

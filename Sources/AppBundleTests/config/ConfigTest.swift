@@ -556,6 +556,7 @@ final class ConfigTest: XCTestCase {
             on-focus-changed = 'focus left'
             on-mode-changed = ['focus right', 'focus up']
             on-focused-monitor-changed = 'focus down'
+            on-monitor-changed = 'exec-and-forget sketchybar --trigger aerospace_monitor_change'
             """,
         )
         assertEquals(result.errors, [])
@@ -563,6 +564,7 @@ final class ConfigTest: XCTestCase {
         XCTAssertTrue(result.config.onFocusChanged.flatten()[0] is FocusCommand)
         assertEquals(result.config.onModeChanged.flatten().count, 2)
         assertEquals(result.config.onFocusedMonitorChanged.flatten().count, 1)
+        assertEquals(result.config.onMonitorChanged.flatten().count, 1)
     }
 
     func testOnFocusChangedTypeError() {
