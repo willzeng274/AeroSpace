@@ -47,6 +47,7 @@ func runHeavyCompleteRefreshSession(
             try await normalizeLayoutReason()
             if shouldLayoutWorkspaces { try await layoutWorkspaces() }
             await checkOnMonitorChangedCallback()
+            if OverlayManager.shared.hasPinnedWindows { OverlayManager.shared.updateOverlayState() }
         }
     }
     switch res {
@@ -81,6 +82,7 @@ func runLightSession<T>(
         updateTrayText()
         SecureInputPanel.shared.refresh()
         if !event.isFocusFollowsMouse { try await layoutWorkspaces() }
+        if OverlayManager.shared.hasPinnedWindows { OverlayManager.shared.updateOverlayState() }
         if focusBefore != focusAfter {
             focusAfter?.nativeFocus() // syncFocusToMacOs
         }

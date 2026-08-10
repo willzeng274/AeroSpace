@@ -1,0 +1,35 @@
+= aerospace-always-on-top(1)
+include::util/man-attributes.adoc[]
+:manname: aerospace-always-on-top
+// tag::purpose[]
+:manpurpose: Toggle an always-on-top overlay for the focused window
+// end::purpose[]
+
+// =========================================================== Synopsis
+== Synopsis
+[verse]
+// tag::synopsis[]
+aerospace always-on-top [-h|--help] [--window-id <window-id>]
+
+// end::synopsis[]
+
+// =========================================================== Description
+== Description
+
+// tag::body[]
+{manpurpose}
+
+The overlay uses ScreenCaptureKit and requires Screen Recording permission. Running the command again for the same window removes the overlay.
+
+// =========================================================== Options
+include::./util/conditional-options-header.adoc[]
+
+-h, --help:: Print help
+
+--window-id <window-id>::
+include::./util/window-id-flag-desc.adoc[]
+
+// end::body[]
+
+// =========================================================== Footer
+include::util/man-footer.adoc[]

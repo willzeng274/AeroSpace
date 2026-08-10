@@ -4,6 +4,8 @@ extension CmdArgs {
     func toCommand() -> ParsedCmd<any Command> {
         let command: any Command
         switch Self.info.kind {
+            case .alwaysOnTop:
+                command = AlwaysOnTopCommand(args: self as! AlwaysOnTopCmdArgs)
             case ._false:
                 command = FalseCommand(args: self as! FalseCmdArgs)
             case ._true:
