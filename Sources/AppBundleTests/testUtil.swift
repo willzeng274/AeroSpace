@@ -88,7 +88,7 @@ extension HotkeyBinding {
         let descriptionWithKeyNotation = modifiers.isEmpty
             ? keyCode.toString()
             : modifiers.toString() + "-" + keyCode.toString()
-        self.init(modifiers, keyCode, commands, descriptionWithKeyNotation: descriptionWithKeyNotation)
+        self.init(CGEventFlags(rawValue: UInt64(modifiers.rawValue)), keyCode, commands, descriptionWithKeyNotation: descriptionWithKeyNotation)
     }
 }
 
