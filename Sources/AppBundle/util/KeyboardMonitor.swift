@@ -1,4 +1,4 @@
-@preconcurrency import AppKit
+@preconcurrency @unsafe import AppKit
 
 struct KeyboardEvent: Sendable {
     let flags: CGEventFlags
@@ -17,22 +17,22 @@ struct KeyboardEvent: Sendable {
 
     private func start() {
         let mask = CGEventMask(1 << CGEventType.keyDown.rawValue)
-        eventTap = CGEvent.tapCreate(
+        unsafe eventTap = unsafe CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
             options: .defaultTap,
             eventsOfInterest: mask,
             callback: { _, type, event, refcon in
-                guard let refcon else { return Unmanaged.passUnretained(event) }
-                let monitor = Unmanaged<KeyboardMonitor>.fromOpaque(refcon).takeUnretainedValue()
+                guard let refcon = unsafe refcon else { return unsafe Unmanaged.passUnretained(event) }
+                let monitor = unsafe Unmanaged<KeyboardMonitor>.fromOpaque(refcon).takeUnretainedValue()
 
                 if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
                     MainActor.assumeIsolated {
-                        if let eventTap = monitor.eventTap {
+                        if let eventTap = unsafe monitor.eventTap {
                             CGEvent.tapEnable(tap: eventTap, enable: true)
                         }
                     }
-                    return Unmanaged.passUnretained(event)
+                    return unsafe Unmanaged.passUnretained(event)
                 }
 
                 let keyboardEvent = KeyboardEvent(
@@ -40,24 +40,24 @@ struct KeyboardEvent: Sendable {
                     keyCode: UInt32(event.getIntegerValueField(.keyboardEventKeycode)),
                 )
                 let handled = MainActor.assumeIsolated { monitor.handler(keyboardEvent) }
-                return handled ? nil : Unmanaged.passUnretained(event)
+                return handled ? nil : unsafe Unmanaged.passUnretained(event)
             },
-            userInfo: Unmanaged.passUnretained(self).toOpaque(),
+            userInfo: unsafe Unmanaged.passUnretained(self).toOpaque(),
         )
 
-        if let eventTap {
-            runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, eventTap, 0)
-            CFRunLoopAddSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
+        if let eventTap = unsafe eventTap {
+            unsafe runLoopSource = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, eventTap, 0)
+            unsafe CFRunLoopAddSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
             CGEvent.tapEnable(tap: eventTap, enable: true)
         }
     }
 
     deinit {
-        if let eventTap {
+        if let eventTap = unsafe eventTap {
             CGEvent.tapEnable(tap: eventTap, enable: false)
             CFMachPortInvalidate(eventTap)
         }
-        if let runLoopSource {
+        if let runLoopSource = unsafe runLoopSource {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
         }
     }
