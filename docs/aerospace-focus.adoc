@@ -18,6 +18,7 @@ aerospace focus [-h|--help] [--ignore-floating] [--wrap-around]
                 (dfs-next|dfs-prev)
 aerospace focus [-h|--help] --window-id <window-id>
 aerospace focus [-h|--help] --dfs-index <dfs-index>
+aerospace focus [-h|--help] (back|forward)
 
 // end::synopsis[]
 
@@ -83,6 +84,12 @@ Set focus to the nearest window in the given direction.
 (dfs-next|dfs-prev)::
 Set focus to the window before or after the current window in the depth-first order (top-to-bottom and left-to-right) of windows in the current workspace tree.
 In this mode, `--boundaries` must be `workspace` (the default) and `--boundaries-action` can be set to one of `(stop|fail|wrap-around-the-workspace)`.
+
+(back|forward)::
+Navigate focus history, similarly to Vim's Ctrl-O (back) and Ctrl-I (forward).
+`focus back` moves to the previously focused window, while `focus forward` moves forward after navigating back.
+Focusing a new window from the middle of history discards the forward entries, and closed windows are skipped automatically.
+This mode is incompatible with all focus flags.
 
 // end::body[]
 

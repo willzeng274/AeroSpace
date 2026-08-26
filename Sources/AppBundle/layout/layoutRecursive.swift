@@ -74,7 +74,13 @@ extension Window {
     fileprivate func layoutFloatingWindow(_ context: LayoutContext) async throws {
         let workspace = context.workspace
         let windowRect = try await getAxRect(.cancellable) // Probably not idempotent
-        let currentMonitor = windowRect?.center.monitorApproximation
+        let workspaceMonitor = workspace.workspaceMonitor
+        // Prefer the workspace's monitor while the center is still inside it. Approximation near
+        // adjoining monitor edges can otherwise select the neighbor and reapply a proportional
+        // move on every workspace switch, slowly drifting the window toward the top-left.
+        let currentMonitor = windowRect.map {
+            workspaceMonitor.rect.contains($0.center) ? workspaceMonitor : $0.center.monitorApproximation
+        }
         if let currentMonitor, let windowRect, workspace != currentMonitor.activeWorkspace {
             let windowTopLeftCorner = windowRect.topLeftCorner
             let xProportion = (windowTopLeftCorner.x - currentMonitor.visibleRect.topLeftX) / currentMonitor.visibleRect.width

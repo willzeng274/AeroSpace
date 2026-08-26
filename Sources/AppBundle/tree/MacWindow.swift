@@ -4,6 +4,7 @@ import Common
 final class MacWindow: Window {
     let macApp: MacApp
     private var prevUnhiddenProportionalPositionInsideWorkspaceRect: CGPoint?
+    private var prevUnhiddenMonitorSize: CGSize?
 
     @MainActor
     private init(_ id: UInt32, _ actor: MacApp, lastFloatingSize: CGSize?, parent: NonLeafTreeNodeObject, adaptiveWeight: CGFloat, index: Int) {
@@ -87,15 +88,25 @@ final class MacWindow: Window {
         let parent = unbindFromParent().parent
         let deadWindowWorkspace = parent.nodeWorkspace
         let focus = focus
-        if let deadWindowWorkspace, deadWindowWorkspace == focus.workspace ||
+        // macOS can move native focus to another same-app window before the AX destruction
+        // notification reaches us. Use workspace visibility instead of that already-corrupted
+        // focus value to decide whether the closing window needs focus recovery.
+        let deadWorkspaceIsVisible = deadWindowWorkspace.map { workspace in
+            monitorInfos.contains { $0.activeWorkspace == workspace }
+        } ?? false
+        if let deadWindowWorkspace, deadWorkspaceIsVisible ||
             deadWindowWorkspace == prevFocusedWorkspace && prevFocusedWorkspaceDate.distance(to: .now) < 1
         {
             switch parent.cases {
+                case .floatingWindowsContainer where focus.windowOrNil?.app.pid == app.pid:
+                    // Let an app manage focus when one of its own dialogs or child frames closes.
+                    // Recalculating here makes Emacs posframes and similar popups jump to another app.
+                    break
                 case .tilingContainer, .floatingWindowsContainer, .macosHiddenAppsWindowsContainer, .macosFullscreenWindowsContainer:
                     let deadWindowFocus = deadWindowWorkspace.toLiveFocus()
                     _ = setFocus(to: deadWindowFocus)
                     // Guard against "Apple Reminders popup" bug: https://github.com/nikitabobko/AeroSpace/issues/201
-                    if focus.windowOrNil?.app.pid != app.pid {
+                    if deadWindowFocus.windowOrNil?.app.pid != app.pid {
                         // Force focus to fix macOS annoyance with focused apps without windows.
                         //   https://github.com/nikitabobko/AeroSpace/issues/65
                         deadWindowFocus.windowOrNil?.nativeFocus()
@@ -135,6 +146,7 @@ final class MacWindow: Window {
                 let absolutePoint = topLeftCorner - monitorRect.topLeftCorner
                 prevUnhiddenProportionalPositionInsideWorkspaceRect =
                     CGPoint(x: absolutePoint.x / monitorRect.width, y: absolutePoint.y / monitorRect.height)
+                prevUnhiddenMonitorSize = CGSize(width: monitorRect.width, height: monitorRect.height)
                 if isFloating {
                     lastFloatingSize = windowRect.size
                 }
@@ -170,12 +182,15 @@ final class MacWindow: Window {
                 let workspaceRect = nodeWorkspace.workspaceMonitor.rect
                 var newX = workspaceRect.topLeftX + workspaceRect.width * prevUnhiddenProportionalPositionInsideWorkspaceRect.x
                 var newY = workspaceRect.topLeftY + workspaceRect.height * prevUnhiddenProportionalPositionInsideWorkspaceRect.y
-                // todo we probably should replace lastFloatingSize with proper floating window sizing
-                // https://github.com/nikitabobko/AeroSpace/issues/1519
-                let windowWidth = lastFloatingSize?.width ?? 0
-                let windowHeight = lastFloatingSize?.height ?? 0
-                newX = newX.coerce(in: workspaceRect.minX ... max(workspaceRect.minX, workspaceRect.maxX - windowWidth))
-                newY = newY.coerce(in: workspaceRect.minY ... max(workspaceRect.minY, workspaceRect.maxY - windowHeight))
+                let workspaceSize = CGSize(width: workspaceRect.width, height: workspaceRect.height)
+                if workspaceSize != prevUnhiddenMonitorSize {
+                    // Coerce only when moving between different-sized monitors. On the same
+                    // monitor, retain intentionally partially off-screen floating positions.
+                    let windowWidth = lastFloatingSize?.width ?? 0
+                    let windowHeight = lastFloatingSize?.height ?? 0
+                    newX = newX.coerce(in: workspaceRect.minX ... max(workspaceRect.minX, workspaceRect.maxX - windowWidth))
+                    newY = newY.coerce(in: workspaceRect.minY ... max(workspaceRect.minY, workspaceRect.maxY - windowHeight))
+                }
 
                 setAxFrame(CGPoint(x: newX, y: newY), nil)
             case .macosNativeFullscreenWindow, .macosNativeHiddenAppWindow, .macosNativeMinimizedWindow,
@@ -183,6 +198,7 @@ final class MacWindow: Window {
         }
 
         self.prevUnhiddenProportionalPositionInsideWorkspaceRect = nil
+        self.prevUnhiddenMonitorSize = nil
     }
 
     override var isHiddenInCorner: Bool {

@@ -282,4 +282,169 @@ final class FocusCommandTest: XCTestCase {
         assertEquals(await parseCommand("focus --boundaries-action wrap-around-the-workspace dfs-next").cmdOrDie.run(.defaultEnv, .emptyStdin).exitCode.rawValue, 0)
         assertEquals(focus.windowOrNil?.windowId, 1)
     }
+
+    func testFocusHistoryBackForward() async {
+        let workspace = Workspace.get(byName: name)
+        var windows: [Window] = []
+        workspace.rootTilingContainer.apply {
+            windows = [
+                TestWindow.new(id: 1, parent: $0),
+                TestWindow.new(id: 2, parent: $0),
+                TestWindow.new(id: 3, parent: $0),
+            ]
+        }
+
+        for window in windows {
+            assertEquals(window.focusWindow(), true)
+            await checkOnFocusChangedCallbacks_nonCancellable()
+        }
+
+        assertEquals(await FocusCommand.new(historyNavigation: .back).run(.defaultEnv, .emptyStdin).exitCode.rawValue, 0)
+        assertEquals(focus.windowOrNil?.windowId, 2)
+        assertEquals(await FocusCommand.new(historyNavigation: .back).run(.defaultEnv, .emptyStdin).exitCode.rawValue, 0)
+        assertEquals(focus.windowOrNil?.windowId, 1)
+        assertEquals(await FocusCommand.new(historyNavigation: .forward).run(.defaultEnv, .emptyStdin).exitCode.rawValue, 0)
+        assertEquals(focus.windowOrNil?.windowId, 2)
+        assertEquals(await FocusCommand.new(historyNavigation: .forward).run(.defaultEnv, .emptyStdin).exitCode.rawValue, 0)
+        assertEquals(focus.windowOrNil?.windowId, 3)
+        assertEquals(await FocusCommand.new(historyNavigation: .forward).run(.defaultEnv, .emptyStdin).exitCode.rawValue, 2)
+    }
+
+    func testFocusHistoryTruncatesForwardHistory() async {
+        let workspace = Workspace.get(byName: name)
+        var windows: [Window] = []
+        workspace.rootTilingContainer.apply {
+            windows = [
+                TestWindow.new(id: 1, parent: $0),
+                TestWindow.new(id: 2, parent: $0),
+                TestWindow.new(id: 3, parent: $0),
+                TestWindow.new(id: 4, parent: $0),
+            ]
+        }
+
+        for window in windows.prefix(3) {
+            assertEquals(window.focusWindow(), true)
+            await checkOnFocusChangedCallbacks_nonCancellable()
+        }
+        assertEquals(await FocusCommand.new(historyNavigation: .back).run(.defaultEnv, .emptyStdin).exitCode.rawValue, 0)
+        assertEquals(focus.windowOrNil?.windowId, 2)
+
+        assertEquals(windows[3].focusWindow(), true)
+        await checkOnFocusChangedCallbacks_nonCancellable()
+        assertEquals(await FocusCommand.new(historyNavigation: .forward).run(.defaultEnv, .emptyStdin).exitCode.rawValue, 2)
+        assertEquals(await FocusCommand.new(historyNavigation: .back).run(.defaultEnv, .emptyStdin).exitCode.rawValue, 0)
+        assertEquals(focus.windowOrNil?.windowId, 2)
+    }
+
+    func testFocusHistoryAtBeginning() async {
+        let workspace = Workspace.get(byName: name)
+        let window = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        assertEquals(window.focusWindow(), true)
+        await checkOnFocusChangedCallbacks_nonCancellable()
+
+        assertEquals(await FocusCommand.new(historyNavigation: .back).run(.defaultEnv, .emptyStdin).exitCode.rawValue, 2)
+        assertEquals(focus.windowOrNil?.windowId, 1)
+    }
+
+    func testFocusHistorySeedsStartupFocus() async {
+        let workspace = Workspace.get(byName: name)
+        let first = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        let second = TestWindow.new(id: 2, parent: workspace.rootTilingContainer)
+
+        assertEquals(first.focusWindow(), true)
+        await $refreshSessionEvent.withValue(.startup) {
+            await checkOnFocusChangedCallbacks_nonCancellable()
+        }
+        assertEquals(second.focusWindow(), true)
+        await checkOnFocusChangedCallbacks_nonCancellable()
+
+        assertEquals(await FocusCommand.new(historyNavigation: .back).run(.defaultEnv, .emptyStdin).exitCode.rawValue, 0)
+        assertEquals(focus.windowOrNil?.windowId, 1)
+    }
+
+    func testFocusHistorySkipsClosedWindows() async {
+        let workspace = Workspace.get(byName: name)
+        var windows: [Window] = []
+        workspace.rootTilingContainer.apply {
+            windows = [
+                TestWindow.new(id: 1, parent: $0),
+                TestWindow.new(id: 2, parent: $0),
+                TestWindow.new(id: 3, parent: $0),
+                TestWindow.new(id: 4, parent: $0),
+            ]
+        }
+
+        for window in windows {
+            assertEquals(window.focusWindow(), true)
+            await checkOnFocusChangedCallbacks_nonCancellable()
+        }
+        windows[2].closeAxWindow()
+
+        assertEquals(await FocusCommand.new(historyNavigation: .back).run(.defaultEnv, .emptyStdin).exitCode.rawValue, 0)
+        assertEquals(focus.windowOrNil?.windowId, 2)
+        assertEquals(await FocusCommand.new(historyNavigation: .forward).run(.defaultEnv, .emptyStdin).exitCode.rawValue, 0)
+        assertEquals(focus.windowOrNil?.windowId, 4)
+    }
+
+    func testFocusBackAndForthUsesHistory() async {
+        let workspace = Workspace.get(byName: name)
+        var windows: [Window] = []
+        workspace.rootTilingContainer.apply {
+            windows = [
+                TestWindow.new(id: 1, parent: $0),
+                TestWindow.new(id: 2, parent: $0),
+                TestWindow.new(id: 3, parent: $0),
+            ]
+        }
+
+        for window in windows {
+            assertEquals(window.focusWindow(), true)
+            await checkOnFocusChangedCallbacks_nonCancellable()
+        }
+
+        let command = FocusBackAndForthCommand(args: FocusBackAndForthCmdArgs(rawArgs: []))
+        assertEquals(await command.run(.defaultEnv, .emptyStdin).exitCode.rawValue, 0)
+        await checkOnFocusChangedCallbacks_nonCancellable()
+        assertEquals(focus.windowOrNil?.windowId, 2)
+        assertEquals(await command.run(.defaultEnv, .emptyStdin).exitCode.rawValue, 0)
+        await checkOnFocusChangedCallbacks_nonCancellable()
+        assertEquals(focus.windowOrNil?.windowId, 3)
+    }
+
+    func testFocusBackAndForthSkipsClosedWindows() async {
+        let workspace = Workspace.get(byName: name)
+        var windows: [Window] = []
+        workspace.rootTilingContainer.apply {
+            windows = [
+                TestWindow.new(id: 1, parent: $0),
+                TestWindow.new(id: 2, parent: $0),
+                TestWindow.new(id: 3, parent: $0),
+            ]
+        }
+
+        for window in windows {
+            assertEquals(window.focusWindow(), true)
+            await checkOnFocusChangedCallbacks_nonCancellable()
+        }
+        windows[1].closeAxWindow()
+
+        let command = FocusBackAndForthCommand(args: FocusBackAndForthCmdArgs(rawArgs: []))
+        assertEquals(await command.run(.defaultEnv, .emptyStdin).exitCode.rawValue, 0)
+        assertEquals(focus.windowOrNil?.windowId, 1)
+    }
+
+    func testFocusHistoryParsing() {
+        testParseSingleCommandSucc("focus back", FocusCmdArgs(rawArgs: [], historyNavigation: .back))
+        testParseSingleCommandSucc("focus forward", FocusCmdArgs(rawArgs: [], historyNavigation: .forward))
+        XCTAssertTrue(parseCommand("focus --ignore-floating back").errorOrNil?.contains("incompatible") == true)
+        XCTAssertTrue(parseCommand("focus --boundaries workspace back").errorOrNil?.contains("incompatible") == true)
+        XCTAssertTrue(parseCommand("focus --wrap-around back").errorOrNil?.contains("incompatible") == true)
+        XCTAssertTrue(parseCommand("focus --fail-if-fullscreen back").errorOrNil?.contains("require using") == true)
+    }
+}
+
+extension FocusCommand {
+    static func new(historyNavigation: HistoryNavigation) -> FocusCommand {
+        FocusCommand(args: FocusCmdArgs(rawArgs: [], historyNavigation: historyNavigation))
+    }
 }

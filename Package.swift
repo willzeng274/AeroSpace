@@ -54,6 +54,9 @@ let package = Package(
                 .target(name: "PrivateApi"),
             ],
             swiftSettings: swiftSettings,
+            linkerSettings: [
+                .unsafeFlags(["-F/System/Library/PrivateFrameworks", "-framework", "SkyLight"]),
+            ],
         ),
         .executableTarget(
             name: "AeroSpaceApp",

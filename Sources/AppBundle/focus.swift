@@ -112,14 +112,39 @@ extension Workspace {
 @MainActor var prevFocusedWorkspaceDate: Date = .distantPast
 @MainActor var prevFocusedWorkspace: Workspace? { _prevFocusedWorkspaceName.map { Workspace.get(byName: $0) } }
 
-// Used by focus-back-and-forth
-@MainActor private var _prevFocus: FrozenFocus? = nil
-@MainActor var prevFocus: LiveFocus? { _prevFocus?.live.takeIf { $0 != focus } }
+// Focus history powers both `focus back|forward` and `focus-back-and-forth`.
+@MainActor private var focusHistory: [FrozenFocus] = []
+@MainActor private var focusHistoryPosition = -1
+@MainActor private var pendingHistoryNavigation: FrozenFocus?
+private let maxFocusHistorySize = 100
+
+@MainActor var prevFocus: LiveFocus? {
+    guard focusHistory.count >= 2 else { return nil }
+    for index in stride(from: focusHistory.count - 2, through: 0, by: -1) {
+        let frozen = focusHistory[index]
+        if let windowId = frozen.windowId, Window.get(byId: windowId) == nil { continue }
+        let live = frozen.live
+        if live != focus { return live }
+    }
+    return nil
+}
+
+@MainActor func resetFocusHistoryForTests() {
+    focusHistory = []
+    focusHistoryPosition = -1
+    pendingHistoryNavigation = nil
+    _lastKnownFocus = focus.frozen
+}
 
 @MainActor private var onFocusChangedRecursionGuard = false
 // Should be called in refreshSession
 @MainActor func checkOnFocusChangedCallbacks_nonCancellable() async {
     if refreshSessionEvent?.isStartup == true {
+        let startupFocus = focus.frozen
+        _lastKnownFocus = startupFocus
+        if startupFocus.windowId != nil {
+            recordFocusHistory(startupFocus)
+        }
         return
     }
     let focus = focus
@@ -128,8 +153,22 @@ extension Workspace {
     var hasFocusedWorkspaceChanged = false
     var hasFocusedMonitorChanged = false
     if frozenFocus != _lastKnownFocus {
-        _prevFocus = _lastKnownFocus
         hasFocusChanged = true
+
+        if let pending = pendingHistoryNavigation,
+           pending.windowId == frozenFocus.windowId,
+           pending.workspaceName == frozenFocus.workspaceName
+        {
+            pendingHistoryNavigation = nil
+        } else {
+            pendingHistoryNavigation = nil
+            // Keep the startup focus when it is a real window. An empty workspace is not a
+            // useful first history entry and would make the first `focus back` surprising.
+            if focusHistory.isEmpty, _lastKnownFocus.windowId != nil {
+                recordFocusHistory(_lastKnownFocus)
+            }
+            recordFocusHistory(frozenFocus)
+        }
     }
     if frozenFocus.workspaceName != _lastKnownFocus.workspaceName {
         _prevFocusedWorkspaceName = _lastKnownFocus.workspaceName
@@ -193,4 +232,48 @@ extension Workspace {
         process.environment = environment
         _ = Result { try process.run() }
     }
+}
+
+// MARK: - Focus history
+
+@MainActor private func recordFocusHistory(_ newFocus: FrozenFocus) {
+    if focusHistory.last == newFocus { return }
+
+    if focusHistoryPosition >= 0, focusHistoryPosition < focusHistory.count - 1 {
+        focusHistory.removeSubrange((focusHistoryPosition + 1)...)
+    }
+
+    focusHistory.append(newFocus)
+    if focusHistory.count > maxFocusHistorySize {
+        focusHistory.removeFirst(focusHistory.count - maxFocusHistorySize)
+    }
+    focusHistoryPosition = focusHistory.count - 1
+}
+
+@MainActor func focusHistoryBack() -> LiveFocus? {
+    while focusHistoryPosition > 0 {
+        focusHistoryPosition -= 1
+        let frozen = focusHistory[focusHistoryPosition]
+        if let windowId = frozen.windowId, Window.get(byId: windowId) == nil { continue }
+        let live = frozen.live
+        if live != focus {
+            pendingHistoryNavigation = frozen
+            return live
+        }
+    }
+    return nil
+}
+
+@MainActor func focusHistoryForward() -> LiveFocus? {
+    while focusHistoryPosition < focusHistory.count - 1 {
+        focusHistoryPosition += 1
+        let frozen = focusHistory[focusHistoryPosition]
+        if let windowId = frozen.windowId, Window.get(byId: windowId) == nil { continue }
+        let live = frozen.live
+        if live != focus {
+            pendingHistoryNavigation = frozen
+            return live
+        }
+    }
+    return nil
 }

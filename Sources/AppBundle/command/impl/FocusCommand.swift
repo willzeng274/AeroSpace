@@ -62,6 +62,16 @@ struct FocusCommand: Command {
                     }
                 }
                 return .from(bool: windows[targetIndex].focusWindow())
+            case .historyBack:
+                guard let targetFocus = focusHistoryBack() else {
+                    return .fail(io.err("Already at the beginning of focus history"))
+                }
+                return .from(bool: setFocus(to: targetFocus))
+            case .historyForward:
+                guard let targetFocus = focusHistoryForward() else {
+                    return .fail(io.err("Already at the end of focus history"))
+                }
+                return .from(bool: setFocus(to: targetFocus))
         }
     }
 }

@@ -1,6 +1,40 @@
 import AppKit
 import Common
 
+// Select a specific window when macOS would otherwise choose a different window belonging to
+// the same application on another monitor. These entry points are also used by yabai, Amethyst,
+// and alt-tab-macos. The regular AX activation path remains the fallback if SkyLight rejects the
+// request on a future macOS release.
+@_silgen_name("GetProcessForPID")
+private func GetProcessForPID(_ pid: pid_t, _ psn: inout ProcessSerialNumber) -> OSStatus
+@_silgen_name("_SLPSSetFrontProcessWithOptions")
+private func _SLPSSetFrontProcessWithOptions(_ psn: inout ProcessSerialNumber, _ windowId: UInt32, _ mode: UInt32) -> CGError
+@_silgen_name("SLPSPostEventRecordTo")
+private func SLPSPostEventRecordTo(_ psn: inout ProcessSerialNumber, _ bytes: inout UInt8) -> CGError
+
+@MainActor
+private func focusWindowWithSkyLight(pid: pid_t, windowId: UInt32) -> Bool {
+    var psn = ProcessSerialNumber()
+    guard GetProcessForPID(pid, &psn) == noErr else { return false }
+    guard _SLPSSetFrontProcessWithOptions(&psn, windowId, 0x200) == .success else { return false }
+
+    for eventType: UInt8 in [0x01, 0x02] {
+        var bytes = [UInt8](repeating: 0, count: 0xF8)
+        bytes[0x04] = 0xF8
+        bytes[0x08] = eventType
+        bytes[0x3A] = 0x10
+        let littleEndianWindowId = windowId.littleEndian
+        for index in 0 ..< MemoryLayout<UInt32>.size {
+            bytes[0x3C + index] = UInt8(truncatingIfNeeded: littleEndianWindowId >> (index * 8))
+        }
+        for index in 0x20 ..< 0x30 {
+            bytes[index] = .max
+        }
+        guard SLPSPostEventRecordTo(&psn, &bytes[0]) == .success else { return false }
+    }
+    return true
+}
+
 // Potential alternative implementation
 // https://github.com/swiftlang/swift-evolution/blob/main/proposals/0392-custom-actor-executors.md
 // (only available since macOS 14)
@@ -138,11 +172,13 @@ final class MacApp: AbstractApp {
         {
             nsApp.activate(options: .activateIgnoringOtherApps)
         } else {
+            let didTargetWindowWithSkyLight = focusWindowWithSkyLight(pid: pid, windowId: windowId)
             MacApp.focusJob = withWindowAsync(windowId, .cancellable) { [nsApp] window, job in
-                // Raise firstly to make sure that by the time we activate the app, the window would be already on top
                 window.set(Ax.isMainAttr, true)
                 AXUIElementPerformAction(window, kAXRaiseAction as CFString)
-                nsApp.activate(options: .activateIgnoringOtherApps)
+                if !didTargetWindowWithSkyLight {
+                    nsApp.activate(options: .activateIgnoringOtherApps)
+                }
             }
         }
     }
